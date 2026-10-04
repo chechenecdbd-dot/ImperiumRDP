@@ -1,0 +1,190 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Package
+      Name="ImperiumRDP"
+      Manufacturer="ImperiumRDP"
+      Version="1.3.3.0"
+      UpgradeCode="948833CA-7A3E-46C4-9B4B-0070DC8221F9"
+      Scope="perMachine"
+      Compressed="yes"
+      Language="1049"
+      Codepage="1251">
+
+    <SummaryInformation Codepage="1251"
+                        Description="ImperiumRDP — удалённый доступ для компьютерного клуба"
+                        Comments="Установка панели администратора и агента ImperiumRDP." />
+
+    <MajorUpgrade DowngradeErrorMessage="Уже установлена более новая версия ImperiumRDP. Удалите её перед установкой." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="DISABLEADVTSHORTCUTS" Value="1" />
+    <Property Id="WixUILicenseRtf" Value="$(sys.CURRENTDIR)license.rtf" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <Property Id="ROLE" Secure="yes" Value="admin" />
+    <Property Id="UPLINK" Secure="yes" />
+
+    <!-- Шрифты мастера (в точности как в стандартном наборе WixUI; без них диалоги
+         рисуются системным шрифтом по умолчанию) -->
+    <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="ImperiumRDP" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppMenuFolder" Name="ImperiumRDP" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+
+    <Feature Id="Main" Level="1" Title="ImperiumRDP">
+      <Component Directory="INSTALLFOLDER" Id="HubExe">
+        <File Id="HubExe" Source="publish\app\ImperiumRDP.exe" KeyPath="yes" />
+      </Component>
+      <Component Directory="INSTALLFOLDER" Id="AgentExe">
+        <File Id="AgentExe" Source="publish\agent\ImperiumRDP.Agent.exe" KeyPath="yes" />
+      </Component>
+      <Component Directory="INSTALLFOLDER" Id="ViewerExe">
+        <File Id="ViewerExe" Source="publish\viewer\ImperiumRDP.Viewer.exe" KeyPath="yes" />
+      </Component>
+      <Component Directory="INSTALLFOLDER" Id="FfmpegExe">
+        <File Id="FfmpegExe" Source="publish\tools\ffmpeg.exe" KeyPath="yes" />
+      </Component>
+
+      <Component Directory="AppMenuFolder" Id="StartMenuShortcut">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="ImperiumRDP"
+                  Description="Панель удалённого доступа ImperiumRDP"
+                  Target="[INSTALLFOLDER]ImperiumRDP.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\ImperiumRDP" Name="StartMenuShortcut"
+                       Type="integer" Value="1" KeyPath="yes" />
+        <RemoveFolder Directory="AppMenuFolder" On="uninstall" />
+      </Component>
+
+      <Component Directory="DesktopFolder" Id="DesktopShortcut">
+        <Shortcut Id="DesktopShortcut"
+                  Name="ImperiumRDP"
+                  Description="Панель удалённого доступа ImperiumRDP"
+                  Target="[INSTALLFOLDER]ImperiumRDP.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\ImperiumRDP" Name="DesktopShortcut"
+                       Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+
+      <!-- Роль «Игровой ПК клуба»: служба-надзиратель, запускает агент в сеансе
+           пользователя при каждом входе (старт без входа не даёт захват экрана). -->
+      <Component Directory="INSTALLFOLDER" Id="ServiceComponent" Condition="ROLE = &quot;club&quot;">
+        <File Id="ServiceExe" Source="publish\service\ImperiumRDP.Service.exe" KeyPath="yes" />
+        <ServiceInstall Id="AgentWatcherService"
+                        Name="ImperiumRDP Agent Watcher"
+                        DisplayName="ImperiumRDP Agent Watcher"
+                        Description="Запускает агент ImperiumRDP в сеансе пользователя при входе в систему."
+                        Arguments="--hidden --uplink [UPLINK]"
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Vital="yes" />
+        <ServiceControl Id="AgentWatcherServiceControl"
+                        Name="ImperiumRDP Agent Watcher"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
+      </Component>
+    </Feature>
+
+    <!-- Правила брандмауэра: тихие netsh-команды (расширение Firewall несовместимо с ru-культурой) -->
+    <CustomAction Id="FwAddAgent" Directory="INSTALLFOLDER" ExeCommand="[System64Folder]netsh.exe advfirewall firewall delete rule name=&quot;ImperiumRDP Agent&quot;"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="FwAddAgent2" Directory="INSTALLFOLDER" ExeCommand="[System64Folder]netsh.exe advfirewall firewall add rule name=&quot;ImperiumRDP Agent&quot; dir=in action=allow program=&quot;[INSTALLFOLDER]ImperiumRDP.Agent.exe&quot; enable=yes profile=any"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="FwAddPanel" Directory="INSTALLFOLDER" ExeCommand="[System64Folder]netsh.exe advfirewall firewall delete rule name=&quot;ImperiumRDP Panel Uplink&quot;"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="FwAddPanel2" Directory="INSTALLFOLDER" ExeCommand="[System64Folder]netsh.exe advfirewall firewall add rule name=&quot;ImperiumRDP Panel Uplink&quot; dir=in action=allow program=&quot;[INSTALLFOLDER]ImperiumRDP.Viewer.exe&quot; enable=yes profile=any"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="FwDelAgent" Directory="INSTALLFOLDER" ExeCommand="[System64Folder]netsh.exe advfirewall firewall delete rule name=&quot;ImperiumRDP Agent&quot;"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="FwDelPanel" Directory="INSTALLFOLDER" ExeCommand="[System64Folder]netsh.exe advfirewall firewall delete rule name=&quot;ImperiumRDP Panel Uplink&quot;"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="FwAddAgent" After="InstallFiles" Condition="NOT Installed" />
+      <Custom Action="FwAddAgent2" After="FwAddAgent" Condition="NOT Installed" />
+      <Custom Action="FwAddPanel" After="FwAddAgent2" Condition="NOT Installed" />
+      <Custom Action="FwAddPanel2" After="FwAddPanel" Condition="NOT Installed" />
+      <Custom Action="FwDelAgent" Before="InstallFinalize" Condition="REMOVE=&quot;ALL&quot;" />
+      <Custom Action="FwDelPanel" After="FwDelAgent" Condition="REMOVE=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
+
+    <!--
+      Собственный поток мастера (аналог WixUI_InstallDir) с гарантированной
+      страницей выбора роли RoleDlg: приветствие → лицензия → папка → РОЛЬ → установка.
+    -->
+    <UI Id="ImperiumRDP_InstallUI">
+      <UIRef Id="WixUI_Common" />
+      <UIRef Id="WixUI_ErrorProgressText" />
+
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+
+      <Publish Dialog="BrowseDlg" Control="OK" Event="SpawnDialog" Value="InvalidDirDlg" Order="4" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Order="2" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" Order="2" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="DoAction" Value="WixUIValidatePath_X64" Order="2"
+               Condition="NOT WIXUI_DONTVALIDATEPATH" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="SpawnDialog" Value="InvalidDirDlg" Order="3"
+               Condition="NOT WIXUI_DONTVALIDATEPATH AND WIXUI_INSTALLDIR_VALID&lt;&gt;&quot;1&quot;" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="RoleDlg" Order="4"
+               Condition="(WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID=&quot;1&quot;) AND NOT Installed" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="5"
+               Condition="(WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID=&quot;1&quot;) AND Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="RoleDlg" Order="2" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="3" Condition="Installed" />
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="InstallDirDlg" Order="2" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" Order="4" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" Order="4" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" Order="2" />
+
+      <Dialog Id="RoleDlg" Width="370" Height="270" Title="[ProductName] — установка">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="8" Width="340" Height="18" Transparent="yes" NoPrefix="yes"
+                 Text="{\WixUI_Font_Bigger}Роль этого компьютера" />
+        <Control Id="Description" Type="Text" X="25" Y="25" Width="340" Height="16" Transparent="yes" NoPrefix="yes"
+                 Text="{\WixUI_Font_Normal}Выберите, как будет использоваться этот ПК" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+        <Control Id="RoleButtons" Type="RadioButtonGroup" Property="ROLE" X="25" Y="58" Width="320" Height="72">
+          <RadioButtonGroup Property="ROLE">
+            <RadioButton Value="admin" X="0" Y="0" Width="310" Height="30" Text="Администраторский ПК" />
+            <RadioButton Value="club" X="0" Y="30" Width="310" Height="30" Text="Игровой ПК клуба" />
+          </RadioButtonGroup>
+        </Control>
+
+        <Control Id="RoleHint" Type="Text" X="45" Y="128" Width="300" Height="56" NoPrefix="yes"
+                 Text="Администраторский: ничего дополнительно, пользуйтесь ярлыком ImperiumRDP.&#10;&#10;Игровой ПК клуба: установится служба, запускающая агент скрыто при входе пользователя." />
+
+        <Control Id="UplinkLabel" Type="Text" X="25" Y="190" Width="320" Height="14" NoPrefix="yes"
+                 Text="Адрес панели (для клуба, напр. dom.ru:4444):" />
+        <Control Id="UplinkEdit" Type="Edit" Property="UPLINK" X="25" Y="205" Width="320" Height="17" />
+        <Control Id="UplinkHint" Type="Text" X="25" Y="224" Width="320" Height="12" NoPrefix="yes"
+                 Text="Для админского ПК оставьте пустым." />
+
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="75" Height="23" Default="yes" Text="Д&amp;алее">
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="1" />
+        </Control>
+        <Control Id="Back" Type="PushButton" X="156" Y="243" Width="75" Height="23" Text="&amp;Назад">
+          <Publish Event="NewDialog" Value="InstallDirDlg" Order="1" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="75" Height="23" Cancel="yes" Text="Отмена">
+          <Publish Event="SpawnDialog" Value="CancelDlg" Order="1" />
+        </Control>
+      </Dialog>
+    </UI>
+
+  </Package>
+</Wix>

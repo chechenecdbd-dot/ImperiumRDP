@@ -1,0 +1,28 @@
+# Build outputs
+bin/
+obj/
+publish/
+out/
+
+# Installer artifacts
+*.msi
+*.wixpdb
+installer/_ref/
+
+# Logs and temp
+*.log
+agent.log
+service.log
+agent.json
+stream.h264
+irdp_idr.h264
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# OS
+Thumbs.db
+.DS_Store
